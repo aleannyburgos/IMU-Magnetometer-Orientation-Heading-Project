@@ -48,6 +48,24 @@ Both sensors can share **I2C1**:
 
 ---
 
+Core/
+
+├── Inc/
+
+│ ├── main.h
+
+│ ├── MPU6050.h
+
+│ ├── QMC5883L.h
+
+├── Src/
+
+├── main.c
+
+├── MPU6050.c
+
+├── QMC5883L.c
+
 ## Firmware Summary
 
 ### MPU6050 Driver
