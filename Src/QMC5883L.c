@@ -1,41 +1,85 @@
 #include "QMC5883L.h"
-float Mx, My, Mz;
-#include <string.h>
-
-
-//returns status of write/read operation
-
-static HAL_StatusTypeDef QMC_write(uint8_t reg, uint8_t v){
-  return HAL_I2C_Mem_Write(&hi2c1, QMC_ADDRESS, reg, I2C_MEMADD_SIZE_8BIT, &v, 1, 100);
-}
-static HAL_StatusTypeDef QMC_read(uint8_t reg, uint8_t *buf, uint16_t n){
-  return HAL_I2C_Mem_Read(&hi2c1, QMC_ADDRESS, reg, I2C_MEMADD_SIZE_8BIT, buf, n, 100);
-}
+#include <stdint.h>
+#include "stm32l4xx_hal.h"
 
 // here we set the config registers and mode
-HAL_StatusTypeDef QMC_Init(void){
-/*  uint8_t id;
-  if (QMC_read(QMC_REG_ID, &id, 1) != HAL_OK){
-	  return HAL_ERROR;
-  }
- */
+HAL_StatusTypeDef QMC_Init(I2C_HandleTypeDef *hi2c, QMC5883L_ERROR *error){
+  uint8_t Chip_ID = 0;
+  HAL_StatusTypeDef status = HAL_I2C_Mem_Read(
+    hi2c,
+    QMC_ADDRESS,
+    QMC_REG_ID,
+    I2C_MEMADD_SIZE_8BIT,
+    &Chip_ID,
+    1
+  );
 
-  //for setting the data output rate and measurement configuration. These are set to default.
-  if (QMC_write(QMC_REG_CR1,  0x45) != HAL_OK) return HAL_ERROR;// configure: 10Hz 64Hz sample rate, C1
-  if (QMC_write(QMC_REG_CR2,  0x00) != HAL_OK) return HAL_ERROR;// reset and interrupt
-  if (QMC_write(QMC_REG_SR, 0x01) != HAL_OK) return HAL_ERROR;//recommended
+  if (status != HAL_OK){
+    *error = QMC5883L_I2C_ERROR;
+    return error;
+  }
+  
+  if (Chip_ID != 0xFF){
+    *error = QMC5883L_CHIP_ID_ERROR;
+    return error;
+  }
+
+  uint8_t data = (OSR_512 | RNG_2G | ODR_10HZ | MODE_CONTIN);
+  status = HAL_I2C_Mem_Write(
+    hi2c,
+    QMC_ADDRESS,
+    QMC_REG_CR1,
+    I2C_MEMADD_SIZE_8BIT,
+    &data,
+    1,
+    1000
+  );
+
+  if (status != HAL_OK) {
+    *error = QMC5883L_CONFIG1_ERROR;
+    return error;
+  }
+
   return HAL_OK;
 }
 
-HAL_StatusTypeDef QMC_ReadGauss(void){
-  uint8_t b[6];
-  if (QMC_read(QMC_REG_OUT_X_M, b, 6) != HAL_OK) return HAL_ERROR;
-  int16_t x = (int16_t)((b[1]<<8) | b[0]);
-  int16_t y = (int16_t)((b[3]<<8) | b[2]);
-  int16_t z = (int16_t)((b[5]<<8) | b[4]);
-  const float lsb_per_gauss = 12000.0f; // for CRB=0x20
-  Mx = x / lsb_per_gauss;
-  My = y / lsb_per_gauss;
-  Mz = z / lsb_per_gauss;
+HAL_StatusTypeDef QMC_ReadGauss(I2C_HandleTypeDef *hi2c, QMC5883L_ERROR *error, QMC5883L_Data_t *data){
+  uint8_t data = 0;
+  HAL_StatusTypeDef status = HAL_I2C_Mem_Read(
+    hi2c,
+    QMC_ADDRESS,
+    QMC_REG_OUT_X_M,
+    I2C_MEMADD_SIZE_8BIT,
+    &data,
+    1
+  );
+  
+  if (status != HAL_OK){
+    *error = QMC5883L_STATUS_ERROR;
+    return error;
+  }
+  
+  if (data == (1 || 3 || 5)) {
+    int8_t data_r [6];
+    status = HAL_I2C_Mem_Read(
+      hi2c,
+      QMC_ADDRESS,
+      QMC_REG_STATUS,
+      I2C_MEMADD_SIZE_8BIT,
+      &data_r,
+      6
+    );
+
+    if (status != HAL_OK){
+      *error = QMC5883L_DATAREAD_ERROR;
+      return error;
+    }
+
+    data -> Mx = (int16_t)((data_r[1] << 8)| data_r[0]); 
+    data -> My = (int16_t)((data_r[3] << 8)| data_r[2]);  
+    data -> Mz = (int16_t)((data_r[5] << 8)| data_r[4]); 
+
+  };
+
   return HAL_OK;
 }

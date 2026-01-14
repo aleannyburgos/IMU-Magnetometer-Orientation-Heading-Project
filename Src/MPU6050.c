@@ -1,126 +1,185 @@
-#include "MPU6050.h"
-#include <string.h>
+/* include:
+    -sample rate divider 25
+    -config 26
+    - gyro config 27
+    -accel config 28
+    -accel measurements 59 - 64
+    -temp measurements 65-66
+    -gyro measurements 67-72
+    -power management 1 107
+    -power management 2 108
+    -who am i 117
+*/
+#include <stdint.h>
+#include "stm32l4xx_hal.h"        // or stm32xxxx_hal_i2c.h
+#include "mpu6050_updated.h"
 
-extern I2C_HandleTypeDef hi2c1;
 
-int16_t Gyro_X_RAW, Gyro_Y_RAW, Gyro_Z_RAW;
-float Gx,Gy,Gz;
-int16_t Accel_X_RAW, Accel_Y_RAW, Accel_Z_RAW;
-float Ax,Ay,Az;
+//initialization function
+//check if its able to connect to I2c and is the right address
+//enable the pwr management
+    //pwr 1
+        //10000000 == 0x80 reset
+        //00000000 == 0x00 clock
+//sample rate divider
+    // 00001001 = 0x09  = 1000 hz  / 1 + 9 (sample rate div) = 100 hz
+//config
+    //00000011- Digital low pass filter smooths out data and reduces noise, 
+    //     delay is after reading is read
+//gyro config
+    //Full scale range, the lower the range the more resolution
+    //set to +/- 250
+//accel config
 
-void MPU6050_Init (void)
+HAL_StatusTypeDef MPU6050_init(I2C_HandleTypeDef *hi2c, MPU_ERROR *error)
 {
-	uint8_t check = 0;
-	//function reads data from specific register (memory address)
-	//HAL_I2C_Mem_Read(I2C_HandleTypeDef *hi2c, uint16_t DevAddress, uint16_t MemAddress, uint16_t MemAddSize, uint8_t *pData, uint16_t Size, uint32_t Timeout)
-	HAL_I2C_Mem_Read(
-			&hi2c1, //I2C_HandleTypeDef pointer
-			MPU6050_ADDR, //the I²C slave address of your device  				  --I2C_HandleTypeDef *hi2c--
-			WHO_AM_I_REG,         //memory address						 				  --uint16_t DevAddress--
-			1,			  //Tells HAL how many bytes wide the register address is --uint16_t MemAddress--
-			&check,		  // pointer to where to store data						  --uint8_t *pData--
-			1,			  //number of bytes to read from device					  --uint16_t Size--
-			1000		  //timeout in ms										  --uint32_t Timeout--
-	);
-	if (check == 0x68)
-	{
-		// power management register 0X6B we should write all 0's to wake the sensor up
-		/*  DEVICE_RESET When set to 1, this bit resets all internal registers to their default values.
-				 		 The bit automatically clears to 0 once the reset is done.
-				 		 The default values for each register can be found in Section 3.
-			SLEEP When set to 1, this bit puts the MPU-60X0 into sleep mode.
-			CYCLE When this bit is set to 1 and SLEEP is disabled, the MPU-60X0 will cycle
-				  between sleep mode and waking up to take a single sample of data from
-				  active sensors at a rate determined by LP_WAKE_CTRL (register 108).
-			TEMP_DIS When set to 1, this bit disables the temperature sensor.
-			CLKSEL 3-bit unsigned value. Specifies the clock source of the device. */
-	    uint8_t Data = 0x00;
-		//HAL_I2C_Mem_Write_IT(I2C_HandleTypeDef *hi2c, uint16_t DevAddress, uint16_t MemAddress, uint16_t MemAddSize, uint8_t *pData, uint16_t Size)
-		HAL_I2C_Mem_Write(
-				&hi2c1,
-				MPU6050_ADDR,
-				PWR_MGMT_1_REG,
-				1,
-				&Data,
-				1,
-				1000
-		);
+    uint8_t mpu_whoami = 0;
+    HAL_StatusTypeDef status = HAL_I2C_Mem_Read (
+                                    hi2c,
+									MPU_I2C_HANDLE_0,
+                                    WHO_AM_I,
+                                    I2C_MEMADD_SIZE_8BIT,
+                                    &mpu_whoami,
+                                    1,
+                                    1000
+                                );
 
-		//sample rate 8khz
-		Data = 0x00;
-		HAL_I2C_Mem_Write(
-				&hi2c1,
-				MPU6050_ADDR,
-				SMPLRT_DIV_REG,
-				1,
-				&Data,
-				1,
-				1000
-		);
-		//Gyroscope Configuration no self tests +/- 250 degrees/s
-		Data = 0x00;
-		HAL_I2C_Mem_Write(
-				&hi2c1,
-				MPU6050_ADDR,
-				GYRO_CONFIG_REG,
-				1,
-				&Data,
-				1,
-				1000
-		);
-		//Accelerometer Configuration no self tests +/- 2g
-		Data = 0x00;
-		HAL_I2C_Mem_Write(
-				&hi2c1,
-				MPU6050_ADDR,
-				ACCEL_CONFIG_REG,
-				1,
-				&Data,
-				1,
-				1000
-		);
-	}
+    if (status != HAL_OK){
+    	*error = I2C_ERROR;
+        return status;
+    }
+
+    if (mpu_whoami != 0x68){
+    	*error = WHOAMI_ERROR;
+        return HAL_ERROR;
+    }
+        //here we are reseting the device then setting the clock
+        uint8_t mpu = PWR_MGMT_1_RESET;
+        status = HAL_I2C_Mem_Write (
+            hi2c,
+			MPU_I2C_HANDLE_0,
+            PWR_MGMT_1,    
+            I2C_MEMADD_SIZE_8BIT,    
+            &mpu,        
+            1,          
+            1000       
+        );
+        if (status != HAL_OK) {
+        	*error = RESET_ERROR;
+            return status;
+        }
+
+        HAL_Delay(100); //were going to init after kernal started
+
+        mpu = PWR_MGMT_1_INTCLK;
+        status = HAL_I2C_Mem_Write (
+            hi2c,
+            MPU_I2C_HANDLE_0,
+            PWR_MGMT_1,    
+            I2C_MEMADD_SIZE_8BIT,    
+            &mpu,        
+            1,          
+            1000       
+        );
+        if (status != HAL_OK) {
+        	*error = CLKINIT_ERROR;
+            return status;
+        }
+
+        mpu = CONFIG_44HZ;
+        status = HAL_I2C_Mem_Write (
+            hi2c,
+            MPU_I2C_HANDLE_0,
+            CONFIG,    
+            I2C_MEMADD_SIZE_8BIT,    
+            &mpu,        
+            1,          
+            1000       
+        );
+        if (status != HAL_OK) {
+        	*error = CONFIG_ERROR;
+            return status;
+        }
+
+        mpu = SMPLRT_DIV_9;
+        status = HAL_I2C_Mem_Write (
+            hi2c,
+            MPU_I2C_HANDLE_0,
+            SMPLRT_DIV,    
+            I2C_MEMADD_SIZE_8BIT,    
+            &mpu,        
+            1,          
+            1000       
+        );
+        if (status != HAL_OK) {
+        	*error = SMPLRT_ERROR;
+            return status;
+        }
+
+        mpu = GYRO_CONFIG_250;
+        status = HAL_I2C_Mem_Write (
+                hi2c,
+                MPU_I2C_HANDLE_0,
+                GYRO_CONFIG,    
+                I2C_MEMADD_SIZE_8BIT,    
+                &mpu,        
+                1,          
+                1000       
+            );
+        if (status != HAL_OK) {
+        	*error = GYROCONFIG_ERROR;
+            return status;
+        }
+        
+        mpu = ACCEL_CONFIG_2G;
+        status = HAL_I2C_Mem_Write (
+            hi2c,
+            MPU_I2C_HANDLE_0,
+            ACCEL_CONFIG,    
+            I2C_MEMADD_SIZE_8BIT,    
+            &mpu,        
+            1,          
+            1000       
+        );
+
+        if (status != HAL_OK) {
+        	*error = ACCELCONFIG_ERROR;
+            return status;
+        }
+    return HAL_OK;
 }
-void MPU6050_Read_Accel (void)
+
+//get data function 
+//gets measurements
+    //ax,ay,az, gx ,gy ,gz are all 16 bit signed integers
+    //the data is stored in a data array that is for 8 bit integers and contains
+    //14 elements. This is for all the data.
+    // the high data is later shifted and concatenated with the lower data
+    // and stored at the address of the variable
+HAL_StatusTypeDef MPU6050_GetData(I2C_HandleTypeDef *hi2c, mpu6050_data_t *data,MPU_ERROR *error)
 {
-	uint8_t Rec_Data[6];
-	HAL_I2C_Mem_Read(
-				&hi2c1,
-				MPU6050_ADDR, //the I²C slave address of your device  				  --I2C_HandleTypeDef *hi2c--
-				ACCEL_XOUT_H,         //memory address						 				  --uint16_t DevAddress--
-				1,			  //Tells HAL how many bytes wide the register address is --uint16_t MemAddress--
-				Rec_Data,		  // pointer to where to store data						  --uint8_t *pData--
-				6,			  //number of bytes to read from device					  --uint16_t Size--
-				1000
-	);
+    uint8_t out[14];
+    HAL_StatusTypeDef status = HAL_I2C_Mem_Read (
+                hi2c,
+                MPU_I2C_HANDLE_0,
+                ACCEL_XOUT_H,    
+                I2C_MEMADD_SIZE_8BIT,    
+                out,
+                14,          
+                1000       
+            );
+    if (status != HAL_OK){
+    	*error = DATAREAD_ERROR;
+        return status;
+    }
 
-	Accel_X_RAW = (int16_t)(Rec_Data[0] << 8 | Rec_Data [1]);
-	Accel_Y_RAW = (int16_t)(Rec_Data[2] << 8 | Rec_Data [3]);
-	Accel_Z_RAW = (int16_t)(Rec_Data[4] << 8 | Rec_Data [5]);
+    data -> ax = (int16_t)((out[0] << 8) | out[1]);
+    data -> ay = (int16_t)((out[2] << 8) | out[3]);
+    data -> az = (int16_t)((out[4] << 8) | out[5]);
+    data -> temp = (int16_t)((out[6] << 8) | out[7]);
+    data -> gx = (int16_t)((out[8] << 8) | out[9]);
+    data -> gy = (int16_t)((out[10] << 8) | out[11]);
+    data -> gz = (int16_t)((out[12] << 8) | out[13]);
 
-	Ax = (float)Accel_X_RAW/16384.0;
-	Ay = (float)Accel_Y_RAW/16384.0;
-	Az = (float)Accel_Z_RAW/16384.0;
-}
-void MPU6050_Read_Gyro (void)
-
-{
-	uint8_t Rec_Data[6];
-	HAL_I2C_Mem_Read(
-				&hi2c1,
-				MPU6050_ADDR, //the I²C slave address of your device  				  --I2C_HandleTypeDef *hi2c--
-				GYRO_XOUT_H,         //memory address						 				  --uint16_t DevAddress--
-				1,			  //Tells HAL how many bytes wide the register address is --uint16_t MemAddress--
-				Rec_Data,		  // pointer to where to store data						  --uint8_t *pData--
-				6,			  //number of bytes to read from device					  --uint16_t Size--
-				1000
-	);
-
-	Gyro_X_RAW = (int16_t)(Rec_Data[0] << 8 | Rec_Data [1]);
-	Gyro_Y_RAW = (int16_t)(Rec_Data[2] << 8 | Rec_Data [3]);
-	Gyro_Z_RAW = (int16_t)(Rec_Data[4] << 8 | Rec_Data [5]);
-
-	Gx = (float)Gyro_X_RAW/131.0;
-	Gy = (float)Gyro_Y_RAW/131.0;
-	Gz = (float)Gyro_Z_RAW/131.0;
+    return HAL_OK;
 }
