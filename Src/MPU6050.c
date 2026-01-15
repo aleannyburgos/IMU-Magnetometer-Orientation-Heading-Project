@@ -69,7 +69,7 @@ HAL_StatusTypeDef MPU6050_init(I2C_HandleTypeDef *hi2c, MPU_ERROR *error)
             return status;
         }
 
-        HAL_Delay(100); //were going to init after kernal started
+        HAL_Delay(100);
 
         mpu = PWR_MGMT_1_INTCLK;
         status = HAL_I2C_Mem_Write (
