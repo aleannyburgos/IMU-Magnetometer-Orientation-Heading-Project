@@ -12,7 +12,7 @@
 */
 #include <stdint.h>
 #include "stm32l4xx_hal.h"        // or stm32xxxx_hal_i2c.h
-#include "mpu6050_updated.h"
+#include "MPU6050.h"
 
 
 //initialization function

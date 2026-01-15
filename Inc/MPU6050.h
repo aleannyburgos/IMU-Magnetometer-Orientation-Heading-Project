@@ -3,8 +3,8 @@ HEADER FILE FOR THE MPU6050.
 THIS WAS MADE USING THE "MPU-6000 and MPU-6050 Register Map and Descriptions Revision 4.2"
  LINK: https://invensense.tdk.com/wp-content/uploads/2015/02/MPU-6000-Register-Map1.pdf
 */
-#ifndef _MPU6050_UPDATED_H
-#define _MPU6050_UPDATED_H
+#ifndef _MPU6050_H
+#define _MPU6050_H
 
 
 //defining the registers that will be used
