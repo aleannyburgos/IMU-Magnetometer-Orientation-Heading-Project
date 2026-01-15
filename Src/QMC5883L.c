@@ -11,17 +11,18 @@ HAL_StatusTypeDef QMC_Init(I2C_HandleTypeDef *hi2c, QMC5883L_ERROR *error){
     QMC_REG_ID,
     I2C_MEMADD_SIZE_8BIT,
     &Chip_ID,
-    1
+    1,
+    1000
   );
 
   if (status != HAL_OK){
     *error = QMC5883L_I2C_ERROR;
-    return error;
+    return status;
   }
   
   if (Chip_ID != 0xFF){
     *error = QMC5883L_CHIP_ID_ERROR;
-    return error;
+    return HAL_ERROR;
   }
 
   uint8_t data = (OSR_512 | RNG_2G | ODR_10HZ | MODE_CONTIN);
@@ -37,49 +38,84 @@ HAL_StatusTypeDef QMC_Init(I2C_HandleTypeDef *hi2c, QMC5883L_ERROR *error){
 
   if (status != HAL_OK) {
     *error = QMC5883L_CONFIG1_ERROR;
-    return error;
+    return status;
   }
 
+  data = 0x00;
+  status = HAL_I2C_Mem_Write(
+    hi2c,
+    QMC_ADDRESS,
+    QMC_REG_CR2,
+    I2C_MEMADD_SIZE_8BIT,
+    &data,
+    1,
+    1000
+  );
+
+  if (status != HAL_OK) {
+    *error = QMC5883L_CONFIG2_ERROR;
+    return status;
+  }
+
+  data = 0x01;
+  status = HAL_I2C_Mem_Write(
+    hi2c,
+    QMC_ADDRESS,
+    QMC_REG_SR,
+    I2C_MEMADD_SIZE_8BIT,
+    &data,
+    1,
+    1000
+  );
+
+  if (status != HAL_OK) {
+    *error = QMC5883L_SR_ERROR;
+    return status;
+  }
   return HAL_OK;
 }
 
 HAL_StatusTypeDef QMC_ReadGauss(I2C_HandleTypeDef *hi2c, QMC5883L_ERROR *error, QMC5883L_Data_t *data){
-  uint8_t data = 0;
+  uint8_t status_reg = 0;
   HAL_StatusTypeDef status = HAL_I2C_Mem_Read(
     hi2c,
     QMC_ADDRESS,
-    QMC_REG_OUT_X_M,
+    QMC_REG_STATUS,
     I2C_MEMADD_SIZE_8BIT,
-    &data,
-    1
+    &status_reg,
+    1,
+    1000
   );
   
   if (status != HAL_OK){
     *error = QMC5883L_STATUS_ERROR;
-    return error;
+    return status;
   }
   
-  if (data == (1 || 3 || 5)) {
-    int8_t data_r [6];
+  if ((status_reg & 0x01) == 0){
+    return HAL_OK;
+  }
+
+    int8_t data_raw[6];
     status = HAL_I2C_Mem_Read(
       hi2c,
       QMC_ADDRESS,
-      QMC_REG_STATUS,
+      QMC_REG_OUT_X_M,
       I2C_MEMADD_SIZE_8BIT,
-      &data_r,
-      6
+      data_raw,
+      6,
+      1000
     );
 
     if (status != HAL_OK){
       *error = QMC5883L_DATAREAD_ERROR;
-      return error;
+      return status;
     }
 
-    data -> Mx = (int16_t)((data_r[1] << 8)| data_r[0]); 
-    data -> My = (int16_t)((data_r[3] << 8)| data_r[2]);  
-    data -> Mz = (int16_t)((data_r[5] << 8)| data_r[4]); 
+    data -> Mx = (int16_t)((data_raw[1] << 8)| data_raw[0]); 
+    data -> My = (int16_t)((data_raw[3] << 8)| data_raw[2]);  
+    data -> Mz = (int16_t)((data_raw[5] << 8)| data_raw[4]); 
 
-  };
 
   return HAL_OK;
 }

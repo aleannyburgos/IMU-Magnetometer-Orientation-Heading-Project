@@ -10,9 +10,9 @@
 #define QMC_REG_ID       0x0D
 
 typedef struct {
-    float Mx;
-    float My;
-    float Mz;
+    int6_t Mx;
+    int6_t My;
+    int6_t Mz;
 } QMC5883L_Data_t;
 
 //bitmask for the control register 1 settings
@@ -36,13 +36,9 @@ typedef enum {
 	QMC5883L_I2C_ERROR,			//0
 	QMC5883L_CHIP_ID_ERROR,		//1
     QMC5883L_CONFIG1_ERROR,		//2
-    
-	QMC5883L_CLKINIT_ERROR,		//3
-	QMC5883L_CONFIG_ERROR,		//4
-	QMC5883L_SMPLRT_ERROR,		//5
-	QMC5883L_GYROCONFIG_ERROR,	//6
-
-	QMC5883L_STATUS_ERROR,	    //7
+	QMC5883L_CONFIG2_ERROR,		//3
+	QMC5883L_SR_ERROR,	        //6
+	QMC5883L_STATUS_ERROR,	    //7 
 	QMC5883L_DATAREAD_ERROR		//8
 } QMC5883L_ERROR;
 
