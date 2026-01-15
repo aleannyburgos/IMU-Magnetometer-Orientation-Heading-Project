@@ -1,6 +1,6 @@
-#include "QMC5883L.h"
 #include <stdint.h>
 #include "stm32l4xx_hal.h"
+#include "QMC5883L.h"
 
 // here we set the config registers and mode
 HAL_StatusTypeDef QMC_Init(I2C_HandleTypeDef *hi2c, QMC5883L_ERROR *error){
