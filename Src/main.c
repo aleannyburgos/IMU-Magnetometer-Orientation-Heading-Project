@@ -24,8 +24,6 @@
 #include "MPU6050.h"
 #include "QMC5883L.h"
 
-extern UART_HandleTypeDef huart2;
-
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -60,25 +58,34 @@ static void MX_GPIO_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_I2C1_Init(void);
 /* USER CODE BEGIN PFP */
-float calculate_heading(float Ax, float Ay, float Az,
-        float Mx, float My, float Mz){
+
+float calculate_heading(mpu6050_data_t *MPU_data, QMC5883L_Data_t *QMC_data){
+  //converting to floats
+  float axf = MPU_data.ax;
+  float ayf = MPU_data.ay;
+  float azf = MPU_data.az;
+
+  float Mxf = QMC_data.Mx;
+  float Myf = QMC_data.My;
+  float Mzf = QMC_data.Mz;
+
 	    // 1. Normalize accelerometer to 1 g (good practice)
-	    float anorm = sqrtf(Ax*Ax + Ay*Ay + Az*Az);
+	    float anorm = sqrtf(axf*axf + ayf*ayf + azf*azf);
 	    if (anorm == 0.0f) anorm = 1.0f;  // avoid div by zero
-	    Ax /= anorm;
-	    Ay /= anorm;
-	    Az /= anorm;
+	    axf /= anorm;
+	    ayf /= anorm;
+	    azf /= anorm;
 
 	    // 2. Compute roll and pitch from accelerometer
-	    float roll  = atan2f(Ay, Az);
-	    float pitch = atan2f(-Ax, sqrtf(Ay*Ay + Az*Az));
+	    float roll  = atan2f(ayf, azf);
+	    float pitch = atan2f(-axf, sqrtf(ayf*ayf + azf*azf));
 
 	    // 3. Tilt-compensate magnetometer
 	    // QMC outputs already converted to Gauss: Mx, My, Mz
-	    float Mx_comp = Mx * cosf(pitch) + Mz * sinf(pitch);
-	    float My_comp = Mx * sinf(roll) * sinf(pitch)
-	                  + My * cosf(roll)
-	                  - Mz * sinf(roll) * cosf(pitch);
+	    float Mx_comp = Mxf * cosf(pitch) + Mzf * sinf(pitch);
+	    float My_comp = Mxf * sinf(roll) * sinf(pitch)
+	                  + Myf * cosf(roll)
+	                  - Mzf * sinf(roll) * cosf(pitch);
 
 	    // 4. Heading in radians, then degrees
 	    // North = 0°, East = 90°
@@ -134,7 +141,7 @@ int main(void)
   MX_USART2_UART_Init();
   MX_I2C1_Init();
   /* USER CODE BEGIN 2 */
-  MPU6050_Init();
+  MPU6050_init();
   QMC_Init();
 
   /* USER CODE END 2 */
@@ -146,10 +153,16 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	  MPU6050_Read_Accel();
-	  MPU6050_Read_Gyro();
-	  QMC_ReadGauss();
-	  float heading = calculate_heading(Ax, Ay, Az, Mx, My, Mz);
+    MPU_ERROR mpu_error;
+    QMC5883L_ERROR qmc_error;
+
+    mpu6050_data_t mpu_data;
+    QMC5883L_Data_t qmc_data;
+
+    MPU6050_init(&hi2c1, &mpu_error, &mpu_error);
+	  QMC_ReadGauss(&hi2c1, &qmc_error, &qmc_data);
+
+	  float heading = calculate_heading(&mpu_data, &qmc_data);
 	  // or: float heading = GetHeadingFromGlobals();
 
 	  char buf[100];
@@ -157,7 +170,9 @@ int main(void)
 	                    "Ax: %.2f Ay: %.2f Az: %.2f  "
 	                    "Mx: %.2f My: %.2f Mz: %.2f  "
 	                    "Heading: %.1f deg\r\n",
-	                    Ax, Ay, Az, Mx, My, Mz, heading);
+	                    (float)mpu_data.ax, (float)mpu_data.ay, (float)mpu_data.az,
+                      (float)qmc_data.Mx, (float)qmc_data.My, (float)qmc_data.Mz,
+                      heading);
 	  HAL_UART_Transmit(&huart2, (uint8_t*)buf, len, 100);
 	  HAL_Delay(200);
 

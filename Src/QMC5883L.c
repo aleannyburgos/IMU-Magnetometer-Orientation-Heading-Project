@@ -77,7 +77,7 @@ HAL_StatusTypeDef QMC_Init(I2C_HandleTypeDef *hi2c, QMC5883L_ERROR *error){
 }
 
 // Saves raw data
-HAL_StatusTypeDef QMC_ReadGauss(I2C_HandleTypeDef *hi2c, QMC5883L_ERROR *error, QMC5883L_Data_t *data){
+HAL_StatusTypeDef QMC_ReadGauss(I2C_HandleTypeDef *hi2c, QMC5883L_ERROR *error, QMC5883L_Data_t *QMC_data){
   uint8_t status_reg = 0;
   HAL_StatusTypeDef status = HAL_I2C_Mem_Read(
     hi2c,

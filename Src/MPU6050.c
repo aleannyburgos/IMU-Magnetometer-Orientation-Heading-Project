@@ -156,7 +156,7 @@ HAL_StatusTypeDef MPU6050_init(I2C_HandleTypeDef *hi2c, MPU_ERROR *error)
     //14 elements. This is for all the data.
     // the high data is later shifted and concatenated with the lower data
     // and stored at the address of the variable
-HAL_StatusTypeDef MPU6050_GetData(I2C_HandleTypeDef *hi2c, mpu6050_data_t *data,MPU_ERROR *error)
+HAL_StatusTypeDef MPU6050_GetData(I2C_HandleTypeDef *hi2c, mpu6050_data_t *MPU_data,MPU_ERROR *error)
 {
     uint8_t out[14];
     HAL_StatusTypeDef status = HAL_I2C_Mem_Read (

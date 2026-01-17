@@ -78,6 +78,6 @@ typedef enum {
 
 //PUBLIC FUNCTIONS
 HAL_StatusTypeDef MPU6050_init(I2C_HandleTypeDef *hi2c, MPU_ERROR *error);
-HAL_StatusTypeDef MPU6050_GetData(I2C_HandleTypeDef *hi2c, mpu6050_data_t *data, MPU_ERROR *error);
+HAL_StatusTypeDef MPU6050_GetData(I2C_HandleTypeDef *hi2c, mpu6050_data_t *MPU_data, MPU_ERROR *error);
 
 #endif 
