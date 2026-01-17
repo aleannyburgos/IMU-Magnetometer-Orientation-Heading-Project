@@ -10,9 +10,9 @@
 #define QMC_REG_ID       0x0D
 
 typedef struct {
-    int6_t Mx;
-    int6_t My;
-    int6_t Mz;
+    int16_t Mx;
+    int16_t My;
+    int16_t Mz;
 } QMC5883L_Data_t;
 
 //bitmask for the control register 1 settings

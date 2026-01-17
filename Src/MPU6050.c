@@ -24,7 +24,7 @@
 //sample rate divider
     // 00001001 = 0x09  = 1000 hz  / 1 + 9 (sample rate div) = 100 hz
 //config
-    //00000011- Digital low pass filter smooths out data and reduces noise, 
+    //00000011- Digital low pass filter smooths out data and reduces noise,
     //     delay is after reading is read
 //gyro config
     //Full scale range, the lower the range the more resolution
@@ -58,11 +58,11 @@ HAL_StatusTypeDef MPU6050_init(I2C_HandleTypeDef *hi2c, MPU_ERROR *error)
         status = HAL_I2C_Mem_Write (
             hi2c,
 			MPU_I2C_HANDLE_0,
-            PWR_MGMT_1,    
-            I2C_MEMADD_SIZE_8BIT,    
-            &mpu,        
-            1,          
-            1000       
+            PWR_MGMT_1,
+            I2C_MEMADD_SIZE_8BIT,
+            &mpu,
+            1,
+            1000
         );
         if (status != HAL_OK) {
         	*error = RESET_ERROR;
@@ -75,11 +75,11 @@ HAL_StatusTypeDef MPU6050_init(I2C_HandleTypeDef *hi2c, MPU_ERROR *error)
         status = HAL_I2C_Mem_Write (
             hi2c,
             MPU_I2C_HANDLE_0,
-            PWR_MGMT_1,    
-            I2C_MEMADD_SIZE_8BIT,    
-            &mpu,        
-            1,          
-            1000       
+            PWR_MGMT_1,
+            I2C_MEMADD_SIZE_8BIT,
+            &mpu,
+            1,
+            1000
         );
         if (status != HAL_OK) {
         	*error = CLKINIT_ERROR;
@@ -90,11 +90,11 @@ HAL_StatusTypeDef MPU6050_init(I2C_HandleTypeDef *hi2c, MPU_ERROR *error)
         status = HAL_I2C_Mem_Write (
             hi2c,
             MPU_I2C_HANDLE_0,
-            CONFIG,    
-            I2C_MEMADD_SIZE_8BIT,    
-            &mpu,        
-            1,          
-            1000       
+            CONFIG,
+            I2C_MEMADD_SIZE_8BIT,
+            &mpu,
+            1,
+            1000
         );
         if (status != HAL_OK) {
         	*error = CONFIG_ERROR;
@@ -105,11 +105,11 @@ HAL_StatusTypeDef MPU6050_init(I2C_HandleTypeDef *hi2c, MPU_ERROR *error)
         status = HAL_I2C_Mem_Write (
             hi2c,
             MPU_I2C_HANDLE_0,
-            SMPLRT_DIV,    
-            I2C_MEMADD_SIZE_8BIT,    
-            &mpu,        
-            1,          
-            1000       
+            SMPLRT_DIV,
+            I2C_MEMADD_SIZE_8BIT,
+            &mpu,
+            1,
+            1000
         );
         if (status != HAL_OK) {
         	*error = SMPLRT_ERROR;
@@ -120,26 +120,26 @@ HAL_StatusTypeDef MPU6050_init(I2C_HandleTypeDef *hi2c, MPU_ERROR *error)
         status = HAL_I2C_Mem_Write (
                 hi2c,
                 MPU_I2C_HANDLE_0,
-                GYRO_CONFIG,    
-                I2C_MEMADD_SIZE_8BIT,    
-                &mpu,        
-                1,          
-                1000       
+                GYRO_CONFIG,
+                I2C_MEMADD_SIZE_8BIT,
+                &mpu,
+                1,
+                1000
             );
         if (status != HAL_OK) {
         	*error = GYROCONFIG_ERROR;
             return status;
         }
-        
+
         mpu = ACCEL_CONFIG_2G;
         status = HAL_I2C_Mem_Write (
             hi2c,
             MPU_I2C_HANDLE_0,
-            ACCEL_CONFIG,    
-            I2C_MEMADD_SIZE_8BIT,    
-            &mpu,        
-            1,          
-            1000       
+            ACCEL_CONFIG,
+            I2C_MEMADD_SIZE_8BIT,
+            &mpu,
+            1,
+            1000
         );
 
         if (status != HAL_OK) {
@@ -149,37 +149,37 @@ HAL_StatusTypeDef MPU6050_init(I2C_HandleTypeDef *hi2c, MPU_ERROR *error)
     return HAL_OK;
 }
 
-//get data function 
+//get data function
 //gets measurements
     //ax,ay,az, gx ,gy ,gz are all 16 bit signed integers
     //the data is stored in a data array that is for 8 bit integers and contains
     //14 elements. This is for all the data.
     // the high data is later shifted and concatenated with the lower data
     // and stored at the address of the variable
-HAL_StatusTypeDef MPU6050_GetData(I2C_HandleTypeDef *hi2c, mpu6050_data_t *MPU_data,MPU_ERROR *error)
+HAL_StatusTypeDef MPU6050_GetData(I2C_HandleTypeDef *hi2c, mpu6050_data_t *MPU_data, MPU_ERROR *error)
 {
     uint8_t out[14];
     HAL_StatusTypeDef status = HAL_I2C_Mem_Read (
                 hi2c,
                 MPU_I2C_HANDLE_0,
-                ACCEL_XOUT_H,    
-                I2C_MEMADD_SIZE_8BIT,    
+                ACCEL_XOUT_H,
+                I2C_MEMADD_SIZE_8BIT,
                 out,
-                14,          
-                1000       
+                14,
+                1000
             );
     if (status != HAL_OK){
     	*error = DATAREAD_ERROR;
         return status;
     }
 
-    data -> ax = (int16_t)((out[0] << 8) | out[1]);
-    data -> ay = (int16_t)((out[2] << 8) | out[3]);
-    data -> az = (int16_t)((out[4] << 8) | out[5]);
-    data -> temp = (int16_t)((out[6] << 8) | out[7]);
-    data -> gx = (int16_t)((out[8] << 8) | out[9]);
-    data -> gy = (int16_t)((out[10] << 8) | out[11]);
-    data -> gz = (int16_t)((out[12] << 8) | out[13]);
+    MPU_data -> ax = (int16_t)((out[0] << 8) | out[1]);
+    MPU_data -> ay = (int16_t)((out[2] << 8) | out[3]);
+    MPU_data -> az = (int16_t)((out[4] << 8) | out[5]);
+    MPU_data -> temp = (int16_t)((out[6] << 8) | out[7]);
+    MPU_data -> gx = (int16_t)((out[8] << 8) | out[9]);
+    MPU_data -> gy = (int16_t)((out[10] << 8) | out[11]);
+    MPU_data -> gz = (int16_t)((out[12] << 8) | out[13]);
 
     return HAL_OK;
 }

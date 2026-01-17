@@ -23,6 +23,8 @@
 /* USER CODE BEGIN Includes */
 #include "MPU6050.h"
 #include "QMC5883L.h"
+#include <math.h>
+
 
 /* USER CODE END Includes */
 
@@ -33,7 +35,6 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
 #define M_PI 3.14159265358979323846f
 
 /* USER CODE END PD */
@@ -49,6 +50,8 @@ I2C_HandleTypeDef hi2c1;
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
+MPU_ERROR mpu_error;
+QMC5883L_ERROR qmc_error;
 
 /* USER CODE END PV */
 
@@ -61,15 +64,15 @@ static void MX_I2C1_Init(void);
 
 float calculate_heading(mpu6050_data_t *MPU_data, QMC5883L_Data_t *QMC_data){
   //converting to floats
-  float axf = MPU_data.ax;
-  float ayf = MPU_data.ay;
-  float azf = MPU_data.az;
+  float axf = MPU_data->ax / 16384.0f;
+  float ayf = MPU_data->ay / 16384.0f;
+  float azf = MPU_data->az / 16384.0f;
 
-  float Mxf = QMC_data.Mx;
-  float Myf = QMC_data.My;
-  float Mzf = QMC_data.Mz;
+  float Mxf = QMC_data->Mx;
+  float Myf = QMC_data->My;
+  float Mzf = QMC_data->Mz;
 
-	    // 1. Normalize accelerometer to 1 g (good practice)
+	    // 1. Normalize accelerometer to 1 g
 	    float anorm = sqrtf(axf*axf + ayf*ayf + azf*azf);
 	    if (anorm == 0.0f) anorm = 1.0f;  // avoid div by zero
 	    axf /= anorm;
@@ -113,9 +116,6 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
-	char buffer1[100];
-	char buffer2[100];
-	char buffer3[100];
 
   /* USER CODE END 1 */
 
@@ -133,7 +133,6 @@ int main(void)
 
   /* USER CODE BEGIN SysInit */
 
-
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
@@ -141,9 +140,8 @@ int main(void)
   MX_USART2_UART_Init();
   MX_I2C1_Init();
   /* USER CODE BEGIN 2 */
-  MPU6050_init();
-  QMC_Init();
-
+  MPU6050_init(&hi2c1, &mpu_error);
+  QMC_Init(&hi2c1, &qmc_error);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -153,30 +151,37 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    MPU_ERROR mpu_error;
-    QMC5883L_ERROR qmc_error;
 
-    mpu6050_data_t mpu_data;
-    QMC5883L_Data_t qmc_data;
+	      mpu6050_data_t mpu_data;
+	      QMC5883L_Data_t qmc_data;
 
-    MPU6050_init(&hi2c1, &mpu_error, &mpu_error);
-	  QMC_ReadGauss(&hi2c1, &qmc_error, &qmc_data);
+	      int ebuf[20];
+	      if (MPU6050_GetData(&hi2c1, &mpu_data, &mpu_error) != HAL_OK){
+	        int len = snprintf(ebuf, sizeof(ebuf),"Error: %d", mpu_error);
+	        HAL_UART_Transmit(&huart2, ebuf, len, 100);
+	        return 0;
+	       };
 
-	  float heading = calculate_heading(&mpu_data, &qmc_data);
-	  // or: float heading = GetHeadingFromGlobals();
+	      if (QMC_ReadGauss(&hi2c1, &qmc_error, &qmc_data) != HAL_OK){
+	        int len = snprintf(ebuf, sizeof(ebuf),"Error: %d", qmc_error);
+	        HAL_UART_Transmit(&huart2, ebuf, len, 100);
+	        return 0;
+	       };
 
-	  char buf[100];
-	  int len = snprintf(buf, sizeof(buf),
-	                    "Ax: %.2f Ay: %.2f Az: %.2f  "
-	                    "Mx: %.2f My: %.2f Mz: %.2f  "
-	                    "Heading: %.1f deg\r\n",
-	                    (float)mpu_data.ax, (float)mpu_data.ay, (float)mpu_data.az,
-                      (float)qmc_data.Mx, (float)qmc_data.My, (float)qmc_data.Mz,
-                      heading);
-	  HAL_UART_Transmit(&huart2, (uint8_t*)buf, len, 100);
-	  HAL_Delay(200);
+	  	  float heading = calculate_heading(&mpu_data, &qmc_data);
+	  	  char buf[100];
+	  	  int len = snprintf(buf, sizeof(buf),
+	  	                    "Ax: %.2f Ay: %.2f Az: %.2f  "
+	  	                    "Mx: %.2f My: %.2f Mz: %.2f  "
+	  	                    "Heading: %.1f deg\r\n",
+	  	                    (float)mpu_data.ax, (float)mpu_data.ay, (float)mpu_data.az,
+	                        (float)qmc_data.Mx, (float)qmc_data.My, (float)qmc_data.Mz,
+	                        heading);
+	  	  HAL_UART_Transmit(&huart2, (uint8_t*)buf, len, 100);
+	  	  HAL_Delay(200);
 
   }
+
   /* USER CODE END 3 */
 }
 
@@ -331,7 +336,7 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : B1_Pin */
   GPIO_InitStruct.Pin = B1_Pin;
@@ -339,12 +344,12 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(B1_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : PA5 */
-  GPIO_InitStruct.Pin = GPIO_PIN_5;
+  /*Configure GPIO pin : LD2_Pin */
+  GPIO_InitStruct.Pin = LD2_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+  HAL_GPIO_Init(LD2_GPIO_Port, &GPIO_InitStruct);
 
   /* USER CODE BEGIN MX_GPIO_Init_2 */
 

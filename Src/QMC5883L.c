@@ -19,7 +19,7 @@ HAL_StatusTypeDef QMC_Init(I2C_HandleTypeDef *hi2c, QMC5883L_ERROR *error){
     *error = QMC5883L_I2C_ERROR;
     return status;
   }
-  
+
   if (Chip_ID != 0xFF){
     *error = QMC5883L_CHIP_ID_ERROR;
     return HAL_ERROR;
@@ -88,17 +88,17 @@ HAL_StatusTypeDef QMC_ReadGauss(I2C_HandleTypeDef *hi2c, QMC5883L_ERROR *error, 
     1,
     1000
   );
-  
+
   if (status != HAL_OK){
     *error = QMC5883L_STATUS_ERROR;
     return status;
   }
-  
+
   if ((status_reg & 0x01) == 0){
     return HAL_OK;
   }
 
-    int8_t data_raw[6];
+    uint8_t data_raw[6];
     status = HAL_I2C_Mem_Read(
       hi2c,
       QMC_ADDRESS,
@@ -114,9 +114,9 @@ HAL_StatusTypeDef QMC_ReadGauss(I2C_HandleTypeDef *hi2c, QMC5883L_ERROR *error, 
       return status;
     }
 
-    data -> Mx = (int16_t)((data_raw[1] << 8)| data_raw[0]); 
-    data -> My = (int16_t)((data_raw[3] << 8)| data_raw[2]);  
-    data -> Mz = (int16_t)((data_raw[5] << 8)| data_raw[4]); 
+    QMC_data->Mx = (int16_t)((uint16_t)data_raw[1] << 8 | data_raw[0]);
+    QMC_data->My = (int16_t)((uint16_t)data_raw[3] << 8 | data_raw[2]);
+    QMC_data->Mz = (int16_t)((uint16_t)data_raw[5] << 8 | data_raw[4]);
 
 
   return HAL_OK;
